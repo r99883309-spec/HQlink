@@ -1,0 +1,5 @@
+{
+  "name": "shortener",
+  "version": "2.0.0",
+  "dependencies": { "@upstash/redis": "^1.34.0" }
+}
