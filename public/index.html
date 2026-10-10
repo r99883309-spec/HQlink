@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Link Shortener</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:sans-serif;background:#0f172a;color:#fff;display:flex;justify-content:center;padding:32px 16px;margin:0}
+  .box{width:100%;max-width:480px}
+  input,button{width:100%;padding:12px;margin:5px 0;border-radius:8px;border:0;font-size:16px}
+  button{background:#6366f1;color:#fff;cursor:pointer}
+  #msg{margin:10px 0;word-break:break-all;min-height:22px}
+  a{color:#a5b4fc}
+  .item{background:#1e293b;border-radius:10px;padding:10px 12px;margin:8px 0;word-break:break-all;font-size:14px}
+  .item small{color:#94a3b8;display:block;margin:4px 0 8px}
+  .row{display:flex;gap:6px}
+  .row button{padding:7px;font-size:13px;margin:0}
+  .del{background:#dc2626}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>🔗 Link Shortener</h2>
+  <input id="key" type="password" placeholder="Admin key">
+  <input id="url" placeholder="https://long-link.com/...">
+  <input id="alias" placeholder="Custom alias (optional)">
+  <button onclick="shorten()">Shorten</button>
+  <div id="msg"></div>
+  <h3>Your links</h3>
+  <div id="list"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+$("key").value=localStorage.getItem("k")||"";
+
+async function api(method,body){
+  const r=await fetch("/api/links",{
+    method,
+    headers:{"Content-Type":"application/json","x-admin-key":$("key").value.trim()},
+    body:body?JSON.stringify(body):undefined
+  });
+  const t=await r.text();
+  let d; try{d=JSON.parse(t)}catch{d={error:"Server "+r.status+": "+t.slice(0,120)}}
+  if(!r.ok&&!d.error) d.error="Error "+r.status;
+  if(r.ok) localStorage.setItem("k",$("key").value.trim());
+  return d;
+}
+
+async function shorten(){
+  $("msg").textContent="...";
+  try{
+    const d=await api("POST",{url:$("url").value.trim(),alias:$("alias").value.trim()});
+    if(d.short){
+      $("msg").innerHTML=`✅ <a href="${d.short}" target="_blank">${d.short}</a>`;
+      navigator.clipboard?.writeText(d.short).catch(()=>{});
+      $("url").value="";$("alias").value="";
+      load();
+    } else $("msg").textContent="❌ "+d.error;
+  }catch(e){$("msg").textContent="❌ "+e.message}
+}
+
+async function load(){
+  try{
+    const d=await api("GET");
+    const list=$("list"); list.innerHTML="";
+    if(!d.links){list.textContent=d.error||"";return}
+    d.links.forEach(l=>{
+      const el=document.createElement("div"); el.className="item";
+      const a=document.createElement("a"); a.href=l.short; a.target="_blank"; a.textContent=l.short;
+      const s=document.createElement("small"); s.textContent=l.url+"  •  "+l.clicks+" clicks";
+      const row=document.createElement("div"); row.className="row";
+      const c=document.createElement("button"); c.textContent="Copy";
+      c.onclick=()=>{navigator.clipboard.writeText(l.short);c.textContent="Copied ✓"};
+      const x=document.createElement("button"); x.textContent="Delete"; x.className="del";
+      x.onclick=async()=>{if(confirm("Delete "+l.code+"?")){await api("DELETE",{code:l.code});load()}};
+      row.append(c,x); el.append(a,s,row); list.append(el);
+    });
+  }catch(e){$("list").textContent="❌ "+e.message}
+}
+if($("key").value) load();
+</script>
+</body>
+  </html>
